@@ -229,6 +229,103 @@ func(r *RabbitMQ) RecieveSub(){
 	}()
 	log.Printf("[*] Wating for message,to exit press ctrl +c")
 	<- forver
+}
+
+func (r *RabbitMQ) PublishRouting(message string){
+	//1. 尝试创建交换机
+	err := r.channel.ExchangeDeclare(
+		r.Exchange,
+		//交换机类型
+		"direct",
+		//是否持久化
+		true,
+		//是否删除
+		false,
+		//
+		false,
+		false,
+		nil,
+	)
+	if err != nil{
+		return
+	}
+	//2. 发送消息
+	err = r.channel.Publish(
+		r.Exchange,
+		r.Key,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "text/plain",
+			Body: []byte(message),
+		},
+	)
+
+}
+
+func (r *RabbitMQ) RecieveRouting(){
+	err := r.channel.ExchangeDeclare(
+		r.Exchange,
+		//交换机类型
+		"direct",
+		//是否持久化
+		true,
+		//是否删除
+		false,
+		//
+		false,
+		false,
+		nil,
+	)
+	if err != nil{
+		return
+	}
+	q,err := r.channel.QueueDeclare(
+		"",
+		false,
+		false,
+		true,
+		false,
+		nil,
+	)
+	//绑定队列到exchange上
+	err = r.channel.QueueBind(
+		q.Name,
+		//在routing模式下，要设置key
+		r.Key,
+		r.Exchange,
+		false,
+		nil,
+	)
+	if err != nil{
+		return 
+	}
+
+	message, err := r.channel.Consume(
+		q.Name,
+		"",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+
+	if err != nil{
+		return
+	}
+
+	//启用携程来处理函数
+	forver := make(chan bool)
+	go func(){
+		for d:= range message{
+			//实现我们要处理的逻辑函数
+			log.Printf("resevie message %s",d.Body)
+		}
+	}()
+	log.Printf("[*] Wating for message,to exit press ctrl +c")
+	<- forver
+
 
 
 
